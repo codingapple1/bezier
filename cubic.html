@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3차(Cubic) 베지어 곡선</title>
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --panel: #12161b;
+      --accent: #6fd3ff;
+      /* curve */
+      --accent-2: #93f5a3;
+      /* step2 + Q */
+      --text: #e8eef6;
+      --muted: #9fb0c0;
+      --danger: #ff637d;
+      --warn: #ffd166;
+      /* step1 */
+      --grid: #1a2027;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: #0b0d10;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      grid-template-rows: auto 1fr auto;
+      grid-template-areas: "header header" "panel canvas" "footer footer";
+      gap: 14px;
+      padding: 14px;
+    }
+
+    header {
+      grid-area: header;
+      background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .02));
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 16px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: .2px;
+    }
+
+    header .sub {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .panel {
+      grid-area: panel;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .panel section {
+      background: rgba(255, 255, 255, .02);
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .row label {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      cursor: grab;
+    }
+
+    input[type="number"],
+    select {
+      width: 100%;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, .08);
+      background: rgba(255, 255, 255, .04);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn.warn {
+      border-color: rgba(255, 209, 102, .3);
+      background: rgba(255, 209, 102, .08);
+      color: #ffe7ab;
+    }
+
+    .btn.danger {
+      border-color: rgba(255, 99, 125, .3);
+      background: rgba(255, 99, 125, .08);
+      color: #ffc1cb;
+    }
+
+    .canvas-wrap {
+      grid-area: canvas;
+      position: relative;
+      background: linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, .01));
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      display: grid;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    footer {
+      grid-area: footer;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 4px 0;
+    }
+
+    .legend {
+      font-size: 12px;
+      color: var(--muted);
+      display: grid;
+      gap: 6px;
+    }
+
+    .legend .item {
+      display: grid;
+      grid-template-columns: 14px 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, .4);
+    }
+
+    .swatch.curve {
+      background: var(--accent);
+    }
+
+    .swatch.polygon {
+      background: #7aa2c3;
+    }
+
+    .swatch.step1 {
+      background: var(--warn);
+    }
+
+    .swatch.step2 {
+      background: var(--accent-2);
+    }
+
+    .swatch.control {
+      background: #e58cff;
+    }
+
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      background: rgba(255, 255, 255, .06);
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, .12);
+    }
+
+    @media (max-width: 980px) {
+      body {
+        grid-template-columns: 1fr;
+        grid-template-areas: "header" "canvas" "panel" "footer";
+        grid-template-rows: auto minmax(50svh, 1fr) auto auto;
+      }
+
+      .canvas-wrap {
+        min-height: 50svh;
+      }
+    }
+
+    @media (max-width: 980px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px; 
+      }
+
+      header h1 {
+        font-size: 16px; 
+      }
+
+      header .legend {
+        width: 100%; 
+        grid-template-columns: 1fr 1fr; 
+      }
+    }
+
+
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>3차(Cubic) 베지어 곡선 Playground</h1>
+    </div>
+    <div class="legend">
+      <div class="item"><span class="swatch curve"></span><span>곡선(Bezier)</span></div>
+      <div class="item"><span class="swatch polygon"></span><span>제어다각형 P0–P1–P2–P3</span></div>
+      <div class="item"><span class="swatch step1"></span><span>1단계 보간점 A(t), B(t), C(t)</span></div>
+      <div class="item"><span class="swatch step2"></span><span>2단계 보간점 D(t), E(t)</span></div>
+      <div class="item"><span class="swatch step2"></span><span>최종 보간점 Q(t)</span></div>
+    </div>
+  </header>
+
+  <aside class="panel">
+    <section>
+      <h2>파라미터</h2>
+      <div class="row">
+        <label for="tRange">t = <span id="tOut">0.33</span></label>
+        <input id="tRange" type="range" min="0" max="1" step="0.001" value="0.33" />
+      </div>
+      <div class="row">
+        <label for="animate">자동 재생</label>
+        <input id="animate" type="checkbox" />
+      </div>
+      <div class="row">
+        <label for="speed">재생 속도</label>
+        <input id="speed" type="range" min="0.1" max="3" step="0.1" value="1" />
+      </div>
+    </section>
+
+    <section>
+      <h2>표시 옵션</h2>
+      <div class="controls">
+        <label><input id="showCurve" type="checkbox" checked /> 곡선 표시</label>
+        <label><input id="showSamples" type="checkbox" /> 곡선 샘플(세그먼트) 표시</label>
+        <label><input id="showPolygon" type="checkbox" checked /> 제어다각형 표시</label>
+
+        <label><input id="showStep1Points" type="checkbox" checked /> 1단계 보간점 A/B/C</label>
+        <label><input id="showStep1Lines" type="checkbox" checked /> 1단계 보간선 (P–A, P–B, P–C)</label>
+
+        <label><input id="showStep2Points" type="checkbox" checked /> 2단계 보간점 D/E</label>
+        <label><input id="showStep2Lines" type="checkbox" checked /> 2단계 보간선 (A–B, B–C, D–E)</label>
+
+        <label><input id="showQ" type="checkbox" checked /> 최종 보간선/점 Q(t)</label>
+        <label><input id="showTangent" type="checkbox" /> Q(t)에서의 접선 표시</label>
+        <label><input id="showGrid" type="checkbox" checked /> 배경 그리드</label>
+        <div class="row">
+          <label for="pointSize">점 크기</label>
+          <input id="pointSize" type="range" min="4" max="18" step="1" value="10" />
+        </div>
+        <div class="row">
+          <label for="midStyle">중간점 스타일</label>
+          <select id="midStyle">
+            <option value="dot">● 점</option>
+            <option value="cross">✕ 십자</option>
+            <option value="square">■ 사각</option>
+          </select>
+        </div>
+        <label><input id="labels" type="checkbox" checked /> 라벨 표시 (P0–P3, A–E, Q)</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>동작</h2>
+      <div class="stack">
+        <button id="resetBtn" class="btn">초기 위치로 리셋</button>
+        <button id="randomBtn" class="btn warn">무작위 위치</button>
+        <button id="copySVGBtn" class="btn">SVG 복사</button>
+        <button id="savePNGBtn" class="btn">PNG 저장</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>사용법</h2>
+      <ul style="margin:0 0 0 18px; padding:0; color: var(--muted); font-size: 13px; line-height: 1.5;">
+        <li>캔버스에서 P0, P1, P2, P3 드래그 가능</li>
+        <li>t 슬라이더 또는 자동 재생으로 데 카스텔조 보간 <b>A/B/C → D/E → Q</b> 확인</li>
+        <li>옵션으로 제어다각형, 접선, 그리드 등을 On/Off 가능</li>
+        <li>SVG 복사, PNG 복사 가능</li>
+      </ul>
+    </section>
+  </aside>
+
+  <div class="canvas-wrap">
+    <canvas id="bezier"></canvas>
+  </div>
+
+
+
+  <script>
+    // ===== Utilities =====
+    const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    const dist2 = (a, b) => { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; };
+
+    // ===== Canvas Setup (HiDPI aware) =====
+    const canvas = document.getElementById('bezier');
+    const ctx = canvas.getContext('2d');
+    function resizeCanvas() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const { clientWidth: w, clientHeight: h } = canvas;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+    const ro = new ResizeObserver(resizeCanvas); ro.observe(canvas);
+
+    // ===== State =====
+    const state = {
+      w: () => canvas.clientWidth,
+      h: () => canvas.clientHeight,
+      points: [ // P0, P1, P2, P3
+        { x: 140, y: 360 },
+        { x: 320, y: 120 },
+        { x: 520, y: 560 },
+        { x: 840, y: 360 },
+      ],
+      t: 0.33,
+      animate: false,
+      speed: 1,
+      dragging: -1,
+      hover: -1,
+      pointSize: 10,
+      show: {
+        curve: true,
+        samples: false,
+        polygon: true,
+        step1Points: true,
+        step1Lines: true,
+        step2Points: true,
+        step2Lines: true,
+        q: true,
+        tangent: false,
+        grid: true,
+        labels: true,
+      },
+      midStyle: 'dot',
+    };
+
+    // ===== Controls Bindings =====
+    const $ = (id) => document.getElementById(id);
+    const tRange = $('tRange');
+    const tOut = $('tOut');
+    const animate = $('animate');
+    const speed = $('speed');
+
+    const showCurve = $('showCurve');
+    const showSamples = $('showSamples');
+    const showPolygon = $('showPolygon');
+
+    const showStep1Points = $('showStep1Points');
+    const showStep1Lines = $('showStep1Lines');
+    const showStep2Points = $('showStep2Points');
+    const showStep2Lines = $('showStep2Lines');
+
+    const showQ = $('showQ');
+    const showTangent = $('showTangent');
+    const showGrid = $('showGrid');
+    const pointSize = $('pointSize');
+    const midStyle = $('midStyle');
+    const labels = $('labels');
+
+    function syncUI() {
+      tRange.value = state.t.toFixed(3);
+      tOut.textContent = Number(state.t).toFixed(2);
+      animate.checked = state.animate;
+      speed.value = state.speed;
+
+      showCurve.checked = state.show.curve;
+      showSamples.checked = state.show.samples;
+      showPolygon.checked = state.show.polygon;
+
+      showStep1Points.checked = state.show.step1Points;
+      showStep1Lines.checked = state.show.step1Lines;
+      showStep2Points.checked = state.show.step2Points;
+      showStep2Lines.checked = state.show.step2Lines;
+
+      showQ.checked = state.show.q;
+      showTangent.checked = state.show.tangent;
+      showGrid.checked = state.show.grid;
+      pointSize.value = state.pointSize;
+      midStyle.value = state.midStyle;
+      labels.checked = state.show.labels;
+    }
+
+    tRange.addEventListener('input', e => { state.t = Number(e.target.value); tOut.textContent = Number(state.t).toFixed(2); draw(); });
+    animate.addEventListener('change', e => { state.animate = e.target.checked; if (state.animate) lastTime = performance.now(); });
+    speed.addEventListener('input', e => { state.speed = Number(e.target.value); });
+
+    showCurve.addEventListener('change', e => { state.show.curve = e.target.checked; draw(); });
+    showSamples.addEventListener('change', e => { state.show.samples = e.target.checked; draw(); });
+    showPolygon.addEventListener('change', e => { state.show.polygon = e.target.checked; draw(); });
+
+    showStep1Points.addEventListener('change', e => { state.show.step1Points = e.target.checked; draw(); });
+    showStep1Lines.addEventListener('change', e => { state.show.step1Lines = e.target.checked; draw(); });
+    showStep2Points.addEventListener('change', e => { state.show.step2Points = e.target.checked; draw(); });
+    showStep2Lines.addEventListener('change', e => { state.show.step2Lines = e.target.checked; draw(); });
+
+    showQ.addEventListener('change', e => { state.show.q = e.target.checked; draw(); });
+    showTangent.addEventListener('change', e => { state.show.tangent = e.target.checked; draw(); });
+    showGrid.addEventListener('change', e => { state.show.grid = e.target.checked; draw(); });
+    pointSize.addEventListener('input', e => { state.pointSize = Number(e.target.value); draw(); });
+    midStyle.addEventListener('change', e => { state.midStyle = e.target.value; draw(); });
+    labels.addEventListener('change', e => { state.show.labels = e.target.checked; draw(); });
+
+    $('resetBtn').addEventListener('click', () => {
+      const w = state.w(), h = state.h();
+      state.points = [
+        { x: w * 0.12, y: h * 0.66 },
+        { x: w * 0.32, y: h * 0.18 },
+        { x: w * 0.58, y: h * 0.86 },
+        { x: w * 0.86, y: h * 0.64 },
+      ];
+      draw();
+    });
+
+    $('randomBtn').addEventListener('click', () => {
+      const w = state.w(), h = state.h();
+      const pad = 40;
+      for (let i = 0; i < 4; i++) {
+        state.points[i].x = pad + Math.random() * (w - 2 * pad);
+        state.points[i].y = pad + Math.random() * (h - 2 * pad);
+      }
+      draw();
+    });
+
+    $('copySVGBtn').addEventListener('click', () => {
+      const svg = toSVG();
+      navigator.clipboard.writeText(svg).then(() => {
+        toast('SVG 코드가 클립보드에 복사되었습니다.');
+      }).catch(() => alert('복사 실패. 브라우저 권한을 확인하세요.'));
+    });
+
+    $('savePNGBtn').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'cubic-bezier.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    // ===== Pointer interactions =====
+    const HIT_R2 = 20 * 20; // in CSS px^2
+    canvas.addEventListener('pointerdown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const p = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      let best = -1, bestD = Infinity;
+      state.points.forEach((pt, i) => {
+        const d = dist2(p, pt);
+        if (d < bestD && d < HIT_R2) { bestD = d; best = i; }
+      });
+      state.dragging = best;
+      if (best !== -1) canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const p = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      if (state.dragging !== -1) {
+        state.points[state.dragging] = p;
+        draw();
+      } else {
+        // hover feedback
+        let hov = -1; let bestD = Infinity;
+        state.points.forEach((pt, i) => {
+          const d = dist2(p, pt);
+          if (d < bestD && d < HIT_R2) { bestD = d; hov = i; }
+        });
+        state.hover = hov;
+        canvas.style.cursor = hov === -1 ? 'default' : 'grab';
+      }
+    });
+
+    canvas.addEventListener('pointerup', (e) => { state.dragging = -1; canvas.releasePointerCapture(e.pointerId); });
+    canvas.addEventListener('pointercancel', () => { state.dragging = -1; });
+
+    // ===== Drawing =====
+    function drawGrid() {
+      const w = state.w(), h = state.h();
+      const step = 40; // px
+      ctx.save();
+      ctx.lineWidth = 1; ctx.strokeStyle = '#17202a';
+      for (let x = 0; x < w; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let y = 0; y < h; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+      ctx.restore();
+    }
+
+    function drawPoint(p, color, size = state.pointSize, style = 'dot') {
+      ctx.save();
+      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.fillStyle = color;
+      if (style === 'dot') { ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      else if (style === 'cross') { ctx.beginPath(); ctx.moveTo(p.x - size, p.y); ctx.lineTo(p.x + size, p.y); ctx.moveTo(p.x, p.y - size); ctx.lineTo(p.x, p.y + size); ctx.strokeStyle = color; ctx.stroke(); }
+      else if (style === 'square') { ctx.beginPath(); ctx.rect(p.x - size, p.y - size, size * 2, size * 2); ctx.fill(); ctx.stroke(); }
+      ctx.restore();
+    }
+
+    function label(p, text) {
+      if (!state.show.labels) return;
+      ctx.save();
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.strokeStyle = 'rgba(0,0,0,.6)';
+      ctx.lineWidth = 3; ctx.miterLimit = 2;
+      ctx.strokeText(text, p.x + 8, p.y - 8);
+      ctx.fillText(text, p.x + 8, p.y - 8);
+      ctx.restore();
+    }
+
+    function draw() {
+      const w = state.w(), h = state.h();
+      ctx.clearRect(0, 0, w, h);
+      if (state.show.grid) drawGrid();
+
+      const [P0, P1, P2, P3] = state.points;
+
+      // control polygon
+      if (state.show.polygon) {
+        ctx.save();
+        ctx.lineWidth = 2; ctx.strokeStyle = '#7aa2c3'; ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.moveTo(P0.x, P0.y); ctx.lineTo(P1.x, P1.y); ctx.lineTo(P2.x, P2.y); ctx.lineTo(P3.x, P3.y); ctx.stroke();
+        ctx.restore();
+      }
+
+      // curve (full)
+      if (state.show.curve) {
+        ctx.save();
+        ctx.lineWidth = 3.5; ctx.strokeStyle = '#6fd3ff'; ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(P0.x, P0.y);
+        ctx.bezierCurveTo(P1.x, P1.y, P2.x, P2.y, P3.x, P3.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // optional sampled curve (polyline approximation)
+      if (state.show.samples) {
+        ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.setLineDash([2, 3]);
+        const steps = 64; ctx.beginPath(); ctx.moveTo(P0.x, P0.y);
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          const A = lerp(P0, P1, t), B = lerp(P1, P2, t), C = lerp(P2, P3, t);
+          const D = lerp(A, B, t), E = lerp(B, C, t);
+          const Q = lerp(D, E, t);
+          ctx.lineTo(Q.x, Q.y);
+        }
+        ctx.stroke(); ctx.restore();
+      }
+
+      // construction at current t
+      const t = state.t;
+      const A = lerp(P0, P1, t); // step1
+      const B = lerp(P1, P2, t);
+      const C = lerp(P2, P3, t);
+      const D = lerp(A, B, t);  // step2
+      const E = lerp(B, C, t);
+      const Q = lerp(D, E, t);  // final
+
+      // step1 lines (short segments)
+      if (state.show.step1Lines) {
+        ctx.save(); ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.strokeStyle = '#ffd166';
+        ctx.beginPath(); ctx.moveTo(P0.x, P0.y); ctx.lineTo(A.x, A.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(P1.x, P1.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(P2.x, P2.y); ctx.lineTo(C.x, C.y); ctx.stroke();
+        ctx.restore();
+      }
+
+      // step2 lines (between step1 points + DE)
+      if (state.show.step2Lines) {
+        ctx.save(); ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.strokeStyle = '#ffd166';
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(B.x, B.y); ctx.lineTo(C.x, C.y); ctx.stroke();
+        ctx.setLineDash([6, 5]); ctx.strokeStyle = '#93f5a3';
+        ctx.beginPath(); ctx.moveTo(D.x, D.y); ctx.lineTo(E.x, E.y); ctx.stroke();
+        ctx.restore();
+      }
+
+      // step1 points
+      if (state.show.step1Points) {
+        drawPoint(A, '#ffd166', Math.max(6, state.pointSize - 2), state.midStyle); label(A, 'A(t)');
+        drawPoint(B, '#ffd166', Math.max(6, state.pointSize - 2), state.midStyle); label(B, 'B(t)');
+        drawPoint(C, '#ffd166', Math.max(6, state.pointSize - 2), state.midStyle); label(C, 'C(t)');
+      }
+
+      // step2 points
+      if (state.show.step2Points) {
+        drawPoint(D, '#93f5a3', Math.max(6, state.pointSize - 1), state.midStyle); label(D, 'D(t)');
+        drawPoint(E, '#93f5a3', Math.max(6, state.pointSize - 1), state.midStyle); label(E, 'E(t)');
+      }
+
+      // Q + rays to D/E
+      if (state.show.q) {
+        ctx.save(); ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.strokeStyle = '#93f5a3';
+        ctx.beginPath(); ctx.moveTo(D.x, D.y); ctx.lineTo(Q.x, Q.y); ctx.moveTo(E.x, E.y); ctx.lineTo(Q.x, Q.y); ctx.stroke();
+        ctx.restore();
+        drawPoint(Q, '#93f5a3', state.pointSize + 2, state.midStyle); label(Q, 'Q(t)');
+      }
+
+      // tangent at Q is along DE vector
+      if (state.show.tangent) {
+        const vx = E.x - D.x, vy = E.y - D.y;
+        const len = Math.hypot(vx, vy) || 1; const nx = vx / len, ny = vy / len; const L = 120;
+        ctx.save(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ff8fab';
+        ctx.beginPath(); ctx.moveTo(Q.x - nx * L, Q.y - ny * L); ctx.lineTo(Q.x + nx * L, Q.y + ny * L); ctx.stroke();
+        ctx.restore();
+      }
+
+      // control points on top
+      drawPoint(P0, '#e58cff', state.pointSize, 'dot'); label(P0, 'P0');
+      drawPoint(P1, '#e58cff', state.pointSize, 'dot'); label(P1, 'P1');
+      drawPoint(P2, '#e58cff', state.pointSize, 'dot'); label(P2, 'P2');
+      drawPoint(P3, '#e58cff', state.pointSize, 'dot'); label(P3, 'P3');
+
+      // hover ring
+      if (state.hover !== -1 && state.dragging === -1) {
+        const p = state.points[state.hover];
+        ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(p.x, p.y, state.pointSize + 6, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      }
+    }
+
+    // ===== Animation loop =====
+    let lastTime = performance.now();
+    let animDir = 1; // 1 forward, 0 backward
+    function tick(now) {
+      const dt = Math.min(0.033, (now - lastTime) / 1000); lastTime = now;
+      if (state.animate) {
+        const v = state.speed * 0.4; // base speed
+        state.t += v * dt * (animDir ? 1 : -1);
+        if (state.t >= 1) { state.t = 1; animDir = 0; }
+        if (state.t <= 0) { state.t = 0; animDir = 1; }
+        tOut.textContent = state.t.toFixed(2);
+        tRange.value = state.t.toFixed(3);
+        draw();
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // ===== Export to SVG =====
+    function toSVG() {
+      const [P0, P1, P2, P3] = state.points;
+      const w = state.w(), h = state.h();
+      const path = `M ${P0.x.toFixed(2)} ${P0.y.toFixed(2)} C ${P1.x.toFixed(2)} ${P1.y.toFixed(2)} ${P2.x.toFixed(2)} ${P2.y.toFixed(2)} ${P3.x.toFixed(2)} ${P3.y.toFixed(2)}`;
+      const svg = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">\n` +
+        `  <path d="${path}" fill="none" stroke="#06c" stroke-width="3" stroke-linecap="round"/>\n` +
+        `</svg>`;
+      return svg;
+    }
+
+    // ===== Toast =====
+    let toastTimer = null;
+    function toast(msg) {
+      let el = document.getElementById('toast');
+      if (!el) {
+        el = document.createElement('div'); el.id = 'toast';
+        Object.assign(el.style, {
+          position: 'fixed', left: '50%', bottom: '26px', transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,.7)', color: '#fff', padding: '10px 14px', borderRadius: '10px',
+          border: '1px solid rgba(255,255,255,.2)', boxShadow: '0 8px 20px rgba(0,0,0,.35)',
+          fontSize: '13px', zIndex: 9999, backdropFilter: 'blur(6px)'
+        });
+        document.body.appendChild(el);
+      }
+      el.textContent = msg; el.style.opacity = '1';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; }, 1400);
+    }
+
+    // ===== Boot =====
+    syncUI();
+    resizeCanvas();
+    draw();
+    requestAnimationFrame(tick);
+    $('resetBtn').click();
+  </script>
+</body>
+
+</html>
